@@ -10,11 +10,18 @@ interface Application {
   jobTitle: string;
   appliedDate: string;
   status: string;
+  currentStage?: string;
 }
 
 interface Job {
   id: number;
   title: string;
+}
+
+interface RecruitmentStage {
+  id: number;
+  stageName: string;
+  stageOrder: number;
 }
 
 const STATUS_OPTIONS = ['PENDING', 'UNDER_REVIEW', 'ACCEPTED', 'SELECTED', 'REJECTED'];
@@ -23,6 +30,7 @@ const CompanyApplications = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [applications, setApplications] = useState<Application[]>([]);
+  const [stages, setStages] = useState<RecruitmentStage[]>([]);
   const [loading, setLoading] = useState(false);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [message, setMessage] = useState('');
@@ -53,10 +61,21 @@ const CompanyApplications = () => {
     }
   };
 
+  const fetchStages = async (jobId: string) => {
+    if (!jobId) return;
+    try {
+      const res = await API.get(`/jobs/${jobId}/stages`);
+      setStages(res.data || []);
+    } catch {
+      setStages([]);
+    }
+  };
+
   const handleJobChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
     setSelectedJobId(val);
     fetchApplications(val);
+    fetchStages(val);
   };
 
   const handleStatusUpdate = async (appId: number, newStatus: string) => {
@@ -70,6 +89,22 @@ const CompanyApplications = () => {
       setMessage(`Application #${appId} status updated to ${newStatus}`);
     } catch {
       setMessage(`Failed to update status for application #${appId}`);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleStageUpdate = async (appId: number, newStage: string) => {
+    setUpdatingId(appId);
+    setMessage('');
+    try {
+      await API.put(`/applications/${appId}`, { currentStage: newStage });
+      setApplications((prev) =>
+        prev.map((a) => (a.id === appId ? { ...a, currentStage: newStage } : a))
+      );
+      setMessage(`Application #${appId} stage updated to ${newStage || 'N/A'}`);
+    } catch {
+      setMessage(`Failed to update stage for application #${appId}`);
     } finally {
       setUpdatingId(null);
     }
@@ -121,6 +156,7 @@ const CompanyApplications = () => {
                 <th style={styles.th}>Email</th>
                 <th style={styles.th}>Resume</th>
                 <th style={styles.th}>Applied Date</th>
+                <th style={styles.th}>Current Stage</th>
                 <th style={styles.th}>Status</th>
                 <th style={styles.th}>Update Status</th>
                 <th style={styles.th}>Offer Letter</th>
@@ -141,6 +177,23 @@ const CompanyApplications = () => {
                   </td>
                   <td style={styles.td}>
                     {app.appliedDate ? new Date(app.appliedDate).toLocaleDateString() : 'N/A'}
+                  </td>
+                  <td style={styles.td}>
+                    {stages.length > 0 ? (
+                      <select
+                        value={app.currentStage || ''}
+                        onChange={(e) => handleStageUpdate(app.id, e.target.value)}
+                        disabled={updatingId === app.id}
+                        style={styles.statusSelect}
+                      >
+                        <option value="">-- Set Stage --</option>
+                        {stages.map((s) => (
+                          <option key={s.id} value={s.stageName}>{s.stageName}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span style={{color: '#999', fontSize: '0.9em'}}>No stages defined</span>
+                    )}
                   </td>
                   <td style={styles.td}>{app.status}</td>
                   <td style={styles.td}>

@@ -6,4 +6,5 @@ import lombok.Data;
 public class ApplicationRequest {
     private Long jobId;
     private String status;
+    private String currentStage;
 }

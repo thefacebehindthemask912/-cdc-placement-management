@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Navbar from '../Navbar';
 import API from '../../api/axios';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface Stats {
   totalStudents: number;
@@ -20,12 +21,39 @@ interface UserEntry {
   cgpa?: number;
 }
 
+interface DeptReport { 
+  department: string; 
+  totalStudents: number; 
+  placedStudents: number; 
+  placementPercentage: number; 
+}
+
+interface StudentReport { 
+  studentId: number; 
+  name: string; 
+  department: string; 
+  appsCount: number; 
+  status: string; 
+}
+
+interface FeedbackEntry {
+  id: number;
+  userEmail: string;
+  userRole: string;
+  rating: number;
+  comments: string;
+  submittedAt: string;
+}
+
 const AdminDashboard = () => {
   const [stats, setStats] = useState<Stats | null>(null);
   const [users, setUsers] = useState<UserEntry[]>([]);
   const [companyStats, setCompanyStats] = useState<Record<string, number>>({});
+  const [deptReports, setDeptReports] = useState<DeptReport[]>([]);
+  const [studentReports, setStudentReports] = useState<StudentReport[]>([]);
+  const [feedbacks, setFeedbacks] = useState<FeedbackEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'reports'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'reports' | 'feedback'>('overview');
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -35,14 +63,20 @@ const AdminDashboard = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [statsRes, usersRes, compRes] = await Promise.all([
+      const [statsRes, usersRes, compRes, deptRes, stRes, fbRes] = await Promise.all([
         API.get('/admin/stats'),
         API.get('/admin/users'),
         API.get('/admin/company-stats'),
+        API.get('/admin/reports/department'),
+        API.get('/admin/reports/student'),
+        API.get('/feedback'),
       ]);
       setStats(statsRes.data);
       setUsers(usersRes.data || []);
       setCompanyStats(compRes.data || {});
+      setDeptReports(deptRes.data || []);
+      setStudentReports(stRes.data || []);
+      setFeedbacks(fbRes.data || []);
     } catch {
       setMessage('Failed to load admin data.');
     } finally {
@@ -84,6 +118,7 @@ const AdminDashboard = () => {
           <button style={tabStyle('overview')} onClick={() => setActiveTab('overview')}>Overview</button>
           <button style={tabStyle('users')} onClick={() => setActiveTab('users')}>User Management</button>
           <button style={tabStyle('reports')} onClick={() => setActiveTab('reports')}>Reports</button>
+          <button style={tabStyle('feedback')} onClick={() => setActiveTab('feedback')}>Feedback</button>
         </div>
 
         {loading ? <p>Loading...</p> : (
@@ -143,7 +178,21 @@ const AdminDashboard = () => {
 
             {activeTab === 'reports' && (
               <>
-                <h3>Company-wise Applications</h3>
+                <div style={styles.chartContainer}>
+                  <h3>Department-wise Placement Percentage</h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={deptReports}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="department" />
+                      <YAxis domain={[0, 100]} />
+                      <RechartsTooltip />
+                      <Legend />
+                      <Bar dataKey="placementPercentage" fill="#8884d8" name="Placement %" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                
+                <h3 style={{ marginTop: '24px' }}>Company-wise Applications</h3>
                 {Object.keys(companyStats).length === 0 ? (
                   <p>No placement data available yet.</p>
                 ) : (
@@ -163,6 +212,56 @@ const AdminDashboard = () => {
                       ))}
                     </tbody>
                   </table>
+                )}
+
+                <h3 style={{ marginTop: '24px' }}>Student Application Summary</h3>
+                <table style={styles.table}>
+                  <thead>
+                    <tr style={styles.theadRow}>
+                       <th style={styles.th}>Name</th>
+                       <th style={styles.th}>Department</th>
+                       <th style={styles.th}>Applications Made</th>
+                       <th style={styles.th}>Placement Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {studentReports.map((sr, idx) => (
+                      <tr key={sr.studentId} style={idx % 2 === 0 ? styles.evenRow : {}}>
+                         <td style={styles.td}>{sr.name || '—'}</td>
+                         <td style={styles.td}>{sr.department || '—'}</td>
+                         <td style={styles.td}>{sr.appsCount}</td>
+                         <td style={styles.td}>
+                           <span style={{color: sr.status === 'Placed' ? '#27ae60' : '#e74c3c', fontWeight: 'bold'}}>{sr.status}</span>
+                         </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            )}
+
+            {activeTab === 'feedback' && (
+              <>
+                <h3>Platform Feedback</h3>
+                {feedbacks.length === 0 ? (
+                  <p>No feedback submitted yet.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {feedbacks.map((fb) => (
+                      <div key={fb.id} style={styles.feedbackCard}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <strong style={{ fontSize: '1.1rem' }}>{fb.userEmail} ({fb.userRole})</strong>
+                          <span style={{ color: '#f39c12', fontWeight: 'bold' }}>⭐ {fb.rating}/5</span>
+                        </div>
+                        <div style={{ color: '#555', marginBottom: '8px', fontStyle: 'italic' }}>
+                          "{fb.comments}"
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#999' }}>
+                          Submitted on {new Date(fb.submittedAt).toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </>
             )}
@@ -188,6 +287,8 @@ const styles: Record<string, React.CSSProperties> = {
   evenRow: { backgroundColor: '#f9f9f9' },
   roleBadge: { padding: '2px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' },
   deleteBtn: { padding: '5px 12px', backgroundColor: '#e74c3c', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' },
+  chartContainer: { background: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #ddd', marginTop: '16px' },
+  feedbackCard: { background: '#fff', padding: '16px', borderRadius: '8px', border: '1px solid #ddd', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
 };
 
 export default AdminDashboard;

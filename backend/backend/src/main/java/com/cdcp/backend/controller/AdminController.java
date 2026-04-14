@@ -102,4 +102,64 @@ public class AdminController {
 
         return ResponseEntity.ok(companyWise);
     }
+
+    @GetMapping("/reports/department")
+    public ResponseEntity<?> getDepartmentReports(@RequestHeader("Authorization") String authHeader) {
+        if (!isAdmin(authHeader)) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse("Admin only"));
+        
+        List<User> students = userRepository.findAll().stream().filter(u -> "student".equals(u.getRole())).collect(Collectors.toList());
+        List<Application> apps = applicationRepository.findAll();
+        
+        Map<String, Map<String, Object>> deptStats = new HashMap<>();
+        
+        for (User student : students) {
+            String dept = student.getDepartment();
+            if (dept == null || dept.trim().isEmpty()) dept = "Unknown";
+            
+            deptStats.putIfAbsent(dept, new HashMap<>(Map.of("totalStudents", 0, "placedStudents", 0)));
+            Map<String, Object> stats = deptStats.get(dept);
+            stats.put("totalStudents", (int)stats.get("totalStudents") + 1);
+            
+            boolean isPlaced = apps.stream().anyMatch(a -> a.getStudentId().equals(student.getId()) && ("SELECTED".equals(a.getStatus()) || "ACCEPTED".equals(a.getStatus())));
+            if (isPlaced) {
+                stats.put("placedStudents", (int)stats.get("placedStudents") + 1);
+            }
+        }
+        
+        for (Map.Entry<String, Map<String, Object>> entry : deptStats.entrySet()) {
+            Map<String, Object> stats = entry.getValue();
+            int total = (int)stats.get("totalStudents");
+            int placed = (int)stats.get("placedStudents");
+            double percentage = total == 0 ? 0.0 : ((double)placed / total) * 100.0;
+            stats.put("placementPercentage", percentage);
+            stats.put("department", entry.getKey());
+        }
+        
+        return ResponseEntity.ok(deptStats.values());
+    }
+
+    @GetMapping("/reports/student")
+    public ResponseEntity<?> getStudentReports(@RequestHeader("Authorization") String authHeader) {
+        if (!isAdmin(authHeader)) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse("Admin only"));
+        
+        List<User> students = userRepository.findAll().stream().filter(u -> "student".equals(u.getRole())).collect(Collectors.toList());
+        List<Application> apps = applicationRepository.findAll();
+        
+        List<Map<String, Object>> studentStats = students.stream().map(student -> {
+            Map<String, Object> stats = new HashMap<>();
+            stats.put("studentId", student.getId());
+            stats.put("name", student.getFirstName() + " " + student.getLastName());
+            stats.put("department", student.getDepartment());
+            
+            List<Application> studentApps = apps.stream().filter(a -> a.getStudentId().equals(student.getId())).collect(Collectors.toList());
+            stats.put("appsCount", studentApps.size());
+            
+            boolean isPlaced = studentApps.stream().anyMatch(a -> "SELECTED".equals(a.getStatus()) || "ACCEPTED".equals(a.getStatus()));
+            stats.put("status", isPlaced ? "Placed" : "Unplaced");
+            
+            return stats;
+        }).collect(Collectors.toList());
+        
+        return ResponseEntity.ok(studentStats);
+    }
 }

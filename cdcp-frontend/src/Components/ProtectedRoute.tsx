@@ -14,8 +14,12 @@ const ProtectedRoute = ({ children, allowedRole }: ProtectedRouteProps) => {
   }
 
   if (role !== allowedRole) {
-    // Redirect to their own dashboard
-    return <Navigate to={`/${role}`} replace />;
+    if (allowedRole === 'shared' && (role === 'student' || role === 'company')) {
+        // Do nothing, it's allowed
+    } else {
+        // Redirect to their own dashboard
+        return <Navigate to={`/${role}`} replace />;
+    }
   }
 
   return <>{children}</>;

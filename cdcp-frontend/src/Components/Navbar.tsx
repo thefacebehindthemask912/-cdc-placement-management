@@ -18,6 +18,7 @@ const Navbar = () => {
           <Link to="/student/profile">My Profile</Link>
           <Link to="/student/jobs">Jobs</Link>
           <Link to="/student/applications">My Applications</Link>
+          <Link to="/feedback">Feedback</Link>
         </>
       );
     }
@@ -27,6 +28,7 @@ const Navbar = () => {
           <Link to="/company">Dashboard</Link>
           <Link to="/company/post-job">Post Job</Link>
           <Link to="/company/applications">Applications</Link>
+          <Link to="/feedback">Feedback</Link>
         </>
       );
     }

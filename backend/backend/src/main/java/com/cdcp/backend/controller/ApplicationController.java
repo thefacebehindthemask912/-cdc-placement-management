@@ -111,7 +111,12 @@ public class ApplicationController {
         }
 
         Application application = appOpt.get();
-        application.setStatus(request.getStatus());
+        if (request.getStatus() != null) {
+            application.setStatus(request.getStatus());
+        }
+        if (request.getCurrentStage() != null) {
+            application.setCurrentStage(request.getCurrentStage());
+        }
         
         return ResponseEntity.ok(applicationRepository.save(application));
     }

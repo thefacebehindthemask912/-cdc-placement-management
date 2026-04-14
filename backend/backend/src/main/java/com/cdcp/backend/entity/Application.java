@@ -29,6 +29,9 @@ public class Application {
     private Date appliedDate;
     private String status; // PENDING, ACCEPTED, REJECTED, SELECTED, JOB DELETED
 
+    // Recruitment Process Stage tracking
+    private String currentStage;
+
     // Offer Letter Upload (SRS UC-08)
     @Lob
     @Column(length = 5000000)

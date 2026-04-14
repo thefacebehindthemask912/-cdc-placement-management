@@ -105,4 +105,39 @@ public class JobController {
 
         return ResponseEntity.ok(jobRepository.save(job));
     }
+
+    @Autowired
+    private com.cdcp.backend.repository.RecruitmentStageRepository recruitmentStageRepository;
+
+    @GetMapping("/{id}/stages")
+    public ResponseEntity<?> getJobStages(@PathVariable Long id) {
+        return ResponseEntity.ok(recruitmentStageRepository.findByJobIdOrderByStageOrderAsc(id));
+    }
+
+    @PostMapping("/{id}/stages")
+    public ResponseEntity<?> addJobStage(@RequestHeader("Authorization") String authHeader, @PathVariable Long id, @RequestBody com.cdcp.backend.entity.RecruitmentStage stage) {
+        User user = getUserFromToken(authHeader);
+        if (user == null || !"company".equals(user.getRole())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse("Only companies can manage stages"));
+        }
+        Optional<Job> jobOpt = jobRepository.findById(id);
+        if (!jobOpt.isPresent()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("Job not found"));
+        }
+        stage.setJobId(id);
+        return ResponseEntity.ok(recruitmentStageRepository.save(stage));
+    }
+
+    @DeleteMapping("/stages/{stageId}")
+    public ResponseEntity<?> deleteJobStage(@RequestHeader("Authorization") String authHeader, @PathVariable Long stageId) {
+        User user = getUserFromToken(authHeader);
+        if (user == null || !"company".equals(user.getRole())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse("Only companies can delete stages"));
+        }
+        if (!recruitmentStageRepository.existsById(stageId)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse("Stage not found"));
+        }
+        recruitmentStageRepository.deleteById(stageId);
+        return ResponseEntity.ok(new ErrorResponse("Stage deleted successfully"));
+    }
 }

@@ -20,6 +20,9 @@ import CompanyApplications from './Components/Company/CompanyApplications';
 // Admin
 import AdminDashboard from './Components/Admin/AdminDashboard';
 
+// Shared
+import FeedbackForm from './Components/Shared/FeedbackForm';
+
 function App() {
   return (
     <AuthProvider>
@@ -95,6 +98,16 @@ function App() {
             element={
               <ProtectedRoute allowedRole="admin">
                 <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Shared Routes */}
+          <Route
+            path="/feedback"
+            element={
+              <ProtectedRoute allowedRole="shared">
+                <FeedbackForm />
               </ProtectedRoute>
             }
           />

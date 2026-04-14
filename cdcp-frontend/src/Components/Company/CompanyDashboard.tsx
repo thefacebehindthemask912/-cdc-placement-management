@@ -14,6 +14,12 @@ interface Job {
   applicationDeadline?: string;
 }
 
+interface RecruitmentStage {
+  id: number;
+  stageName: string;
+  stageOrder: number;
+}
+
 type EditForm = {
   title: string;
   description: string;
@@ -37,6 +43,12 @@ const CompanyDashboard = () => {
   const [editForm, setEditForm] = useState<EditForm>(emptyForm());
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
+
+  // Stages Management state
+  const [stagesJob, setStagesJob] = useState<Job | null>(null);
+  const [stages, setStages] = useState<RecruitmentStage[]>([]);
+  const [newStageName, setNewStageName] = useState('');
+  const [newStageOrder, setNewStageOrder] = useState('');
 
   const fetchJobs = async () => {
     try {
@@ -77,6 +89,41 @@ const CompanyDashboard = () => {
   };
 
   const closeEdit = () => { setEditingJob(null); setSaveMsg(''); };
+
+  const openStages = async (job: Job) => {
+    setStagesJob(job);
+    try {
+      const res = await API.get(`/jobs/${job.id}/stages`);
+      setStages(res.data || []);
+    } catch {
+      setStages([]);
+    }
+  };
+  const closeStages = () => { setStagesJob(null); setStages([]); setNewStageName(''); setNewStageOrder(''); };
+
+  const handleAddStage = async () => {
+    if (!newStageName || !newStageOrder || !stagesJob) return;
+    try {
+      const res = await API.post(`/jobs/${stagesJob.id}/stages`, {
+        stageName: newStageName,
+        stageOrder: parseInt(newStageOrder)
+      });
+      setStages([...stages, res.data].sort((a,b) => a.stageOrder - b.stageOrder));
+      setNewStageName('');
+      setNewStageOrder('');
+    } catch {
+      alert('Failed to add stage');
+    }
+  };
+
+  const handleDeleteStage = async (stageId: number) => {
+    try {
+      await API.delete(`/jobs/stages/${stageId}`);
+      setStages(stages.filter(s => s.id !== stageId));
+    } catch {
+      alert('Failed to delete stage');
+    }
+  };
 
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setEditForm(f => ({ ...f, [e.target.name]: e.target.value }));
@@ -147,6 +194,8 @@ const CompanyDashboard = () => {
                       <td style={styles.td}>{job.requiredCgpa ?? '—'}</td>
                       <td style={styles.td}>{job.applicationDeadline || '—'}</td>
                       <td style={styles.td}>
+                        <button style={styles.manageBtn} onClick={() => openStages(job)}>⚙️ Stages</button>
+                        {' '}
                         <button style={styles.editBtn} onClick={() => openEdit(job)}>✏️ Edit</button>
                         {' '}
                         <button style={styles.deleteBtn} onClick={() => handleDelete(job.id)}>🗑 Delete</button>
@@ -223,6 +272,58 @@ const CompanyDashboard = () => {
           </div>
         </div>
       )}
+
+      {/* ── Manage Stages Modal ── */}
+      {stagesJob && (
+        <div style={styles.overlay} onClick={closeStages}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <h3 style={{ margin: 0 }}>Manage Stages — {stagesJob.title}</h3>
+              <button style={styles.closeBtn} onClick={closeStages}>✕</button>
+            </div>
+            <div style={styles.modalBody}>
+              <p>Define custom recruitment stages (like Written Test, HR Interview) that applicants will go through.</p>
+              
+              <table style={styles.table}>
+                <thead>
+                  <tr style={styles.theadRow}>
+                    <th style={{...styles.th, width: '60px'}}>Order</th>
+                    <th style={styles.th}>Stage Name</th>
+                    <th style={{...styles.th, width: '80px'}}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stages.map((stg) => (
+                    <tr key={stg.id}>
+                      <td style={styles.td}>{stg.stageOrder}</td>
+                      <td style={styles.td}><strong>{stg.stageName}</strong></td>
+                      <td style={styles.td}>
+                        <button style={styles.deleteBtn} onClick={() => handleDeleteStage(stg.id)}>✕</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {stages.length === 0 && (
+                    <tr><td colSpan={3} style={styles.td}>No custom stages defined.</td></tr>
+                  )}
+                </tbody>
+              </table>
+
+              <div style={{ marginTop: '20px', padding: '15px', background: '#f5f5f5', borderRadius: '8px' }}>
+                <h4 style={{ margin: '0 0 10px 0' }}>Add New Stage</h4>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <input style={styles.input} type="number" placeholder="Order (e.g. 1)" value={newStageOrder} onChange={e => setNewStageOrder(e.target.value)} />
+                  <input style={{...styles.input, flex: 1}} type="text" placeholder="Stage Name (e.g. Technical Interview)" value={newStageName} onChange={e => setNewStageName(e.target.value)} />
+                  <button style={styles.saveBtn} onClick={handleAddStage}>Add</button>
+                </div>
+              </div>
+
+            </div>
+            <div style={styles.modalFooter}>
+              <button style={styles.cancelBtn} onClick={closeStages}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
@@ -238,6 +339,7 @@ const styles: Record<string, React.CSSProperties> = {
   th: { padding: '10px 14px', textAlign: 'left', fontWeight: 'bold' },
   td: { padding: '10px 14px', borderBottom: '1px solid #eee' },
   evenRow: { backgroundColor: '#f9f9f9' },
+  manageBtn: { padding: '5px 12px', backgroundColor: '#8e44ad', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' },
   editBtn: { padding: '5px 12px', backgroundColor: '#2980b9', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' },
   deleteBtn: { padding: '5px 12px', backgroundColor: '#e74c3c', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' },
 
